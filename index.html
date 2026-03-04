@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Net Revenue Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@300;400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--s2:#1c2330;--border:#2a3441;
+  --accent:#00d4aa;--danger:#ff5a5a;--text:#e6edf3;--muted:#7d8590;
+  --green:#3fb950;--amber:#f0a500;--r:10px;
+}
+body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── UPLOAD ── */
+#upload-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(0,212,170,.12) 0%,transparent 60%),var(--bg)}
+.u-logo{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:40px;opacity:.7}
+.u-title{font-family:'Syne',sans-serif;font-size:clamp(30px,5vw,52px);font-weight:800;text-align:center;line-height:1.1;margin-bottom:14px;background:linear-gradient(135deg,#e6edf3 0%,var(--accent) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.u-sub{font-size:15px;color:var(--muted);text-align:center;max-width:460px;margin-bottom:48px;line-height:1.7}
+.drop-zone{width:100%;max-width:520px;border:2px dashed var(--border);border-radius:14px;padding:48px 36px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:rgba(0,212,170,.04)}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-zone h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:600;margin:12px 0 6px}
+.drop-zone p{font-size:13px;color:var(--muted)}
+.demo-btn{margin-top:20px;background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Instrument Sans',sans-serif;font-size:13px;padding:7px 18px;border-radius:7px;cursor:pointer;transition:border-color .2s,color .2s}
+.demo-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── LAYOUT ── */
+#dashboard{display:none;min-height:100vh}
+.dash-nav{position:sticky;top:0;z-index:200;background:rgba(13,17,23,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:0 24px;height:50px;display:flex;align-items:center;gap:14px}
+.dash-logo{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.nav-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.ntag{font-size:11px;background:rgba(0,212,170,.1);color:var(--accent);border:1px solid rgba(0,212,170,.2);padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
+.ibtn{font-size:11px;background:transparent;border:1px solid var(--border);color:var(--muted);padding:4px 11px;border-radius:6px;cursor:pointer;font-family:'Instrument Sans',sans-serif;transition:all .15s}
+.ibtn:hover{border-color:var(--danger);color:var(--danger)}
+
+/* breadcrumb */
+.bc{background:rgba(0,212,170,.04);border-bottom:1px solid rgba(0,212,170,.1);padding:8px 24px;display:none;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap}
+.bc.on{display:flex}
+.bc-link{color:var(--accent);cursor:pointer;background:none;border:none;font-family:'Instrument Sans',sans-serif;font-size:12px;padding:0;transition:opacity .15s}
+.bc-link:hover{opacity:.7;text-decoration:underline}
+.bc-cur{color:var(--text);font-weight:500}
+.bc-sep{color:var(--border)}
+.bc-back{background:transparent;border:1px solid rgba(0,212,170,.3);color:var(--accent);font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;font-family:'Instrument Sans',sans-serif;transition:background .15s;margin-right:2px}
+.bc-back:hover{background:rgba(0,212,170,.1)}
+
+/* ── FILTER BAR ── */
+.filter-bar{background:var(--s2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fg input,.fg select{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Instrument Sans',sans-serif;font-size:12px;padding:5px 10px;border-radius:6px;outline:none;transition:border-color .15s;min-width:140px}
+.fg input:focus,.fg select:focus{border-color:var(--accent)}
+.fg select option{background:var(--surface)}
+.filter-bar .fg-search input{min-width:220px}
+.filter-actions{display:flex;gap:8px;align-items:flex-end;margin-left:auto}
+.f-apply{background:var(--accent);color:#0d1117;border:none;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;padding:6px 16px;border-radius:6px;cursor:pointer;transition:opacity .15s}
+.f-apply:hover{opacity:.85}
+.f-clear{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Instrument Sans',sans-serif;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;transition:all .15s}
+.f-clear:hover{border-color:var(--danger);color:var(--danger)}
+
+/* toggle pills */
+.toggle-group{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tpill{background:var(--bg);border:1px solid var(--border);color:var(--muted);font-size:11px;padding:4px 11px;border-radius:20px;cursor:pointer;transition:all .15s;font-family:'Instrument Sans',sans-serif;white-space:nowrap}
+.tpill:hover{border-color:var(--accent);color:var(--accent)}
+.tpill.on{background:rgba(0,212,170,.12);border-color:var(--accent);color:var(--accent);font-weight:600}
+.tpill.amber.on{background:rgba(240,165,0,.12);border-color:var(--amber);color:var(--amber)}
+
+/* active filter tags */
+.active-filters{padding:8px 24px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(0,212,170,.02);border-bottom:1px solid var(--border)}
+.active-filters:empty{display:none}
+.af-tag{background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.2);color:var(--accent);font-size:11px;padding:3px 10px;border-radius:20px;display:flex;align-items:center;gap:6px}
+.af-tag button{background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;line-height:1;padding:0;opacity:.7}
+.af-tag button:hover{opacity:1}
+
+/* ── BODY ── */
+.dash-body{padding:24px;max-width:1500px;margin:0 auto}
+
+/* KPIs */
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--accent))}
+.kpi-l{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.kpi-v{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;color:var(--kc,var(--text));line-height:1;margin-bottom:3px}
+.kpi-s{font-size:11px;color:var(--muted)}
+
+/* charts */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:860px){.grid-2{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.ph{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ph h3{font-family:'Syne',sans-serif;font-size:13px;font-weight:600}
+.ph span{font-size:11px;color:var(--muted)}
+.pb{padding:16px}
+.cw{position:relative;height:240px}
+
+/* table */
+.tscroll{overflow-x:auto}
+.dt{width:100%;border-collapse:collapse;font-size:12px}
+.dt thead th{padding:8px 12px;text-align:right;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s}
+.dt thead th.tl{text-align:left}
+.dt thead th:hover{color:var(--text)}
+.dt thead th.sa::after{content:' ↑'}
+.dt thead th.sd::after{content:' ↓'}
+.dt tbody td{padding:9px 12px;text-align:right;border-bottom:1px solid rgba(42,52,65,.35);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dt tbody td.tl{text-align:left}
+.dt tbody tr:hover td{background:var(--s2)}
+.dt tfoot td{padding:9px 12px;text-align:right;border-top:1px solid var(--border);font-weight:600;font-variant-numeric:tabular-nums}
+.dt tfoot td.tl{text-align:left}
+.cn{color:var(--accent)!important;font-weight:600!important}
+.ct{color:var(--amber)!important}
+.drill{color:var(--accent);cursor:pointer;background:none;border:none;font-family:'Instrument Sans',sans-serif;font-size:12px;text-align:left;padding:0;font-weight:500;transition:opacity .15s}
+.drill:hover{opacity:.65;text-decoration:underline}
+.sub{font-size:10px;color:var(--muted);display:block;margin-top:1px}
+.mp{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700}
+.mh{background:rgba(63,185,80,.15);color:var(--green)}
+.mm{background:rgba(240,165,0,.15);color:var(--amber)}
+.ml{background:rgba(255,90,90,.15);color:var(--danger)}
+.cos-tag{display:inline-block;background:rgba(240,165,0,.12);border:1px solid rgba(240,165,0,.25);color:var(--amber);font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;white-space:nowrap}
+.excl-tag{display:inline-block;background:rgba(255,90,90,.1);border:1px solid rgba(255,90,90,.2);color:var(--danger);font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+
+/* view tabs */
+.vtabs{display:flex;gap:4px}
+.vt{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:11px;padding:4px 11px;border-radius:5px;cursor:pointer;font-family:'Instrument Sans',sans-serif;transition:all .15s}
+.vt.on{background:rgba(0,212,170,.1);border-color:var(--accent);color:var(--accent)}
+
+.notice{background:rgba(240,165,0,.07);border:1px solid rgba(240,165,0,.2);border-radius:8px;padding:9px 14px;font-size:12px;color:var(--amber);margin-bottom:18px;display:flex;gap:8px}
+</style>
+</head>
+<body>
+
+<!-- UPLOAD -->
+<div id="upload-screen">
+  <div class="u-logo">Productive · Polaris</div>
+  <h1 class="u-title">Net Revenue<br>Dashboard</h1>
+  <p class="u-sub">Export Query 1 from Polaris, drop the CSV here. Filter by date, client, job — drill from client → job → budget.</p>
+  <div class="drop-zone" id="drop-zone">
+    <span style="font-size:36px">📂</span>
+    <h3>Drop your Polaris CSV export here</h3>
+    <p>or click to browse · Query 1 (v4) format</p>
+    <input type="file" id="file-input" accept=".csv">
+  </div>
+  <button class="demo-btn" id="demo-btn">Load sample data</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <nav class="dash-nav">
+    <span class="dash-logo">Net Revenue</span>
+    <div class="nav-right">
+      <span class="ntag" id="nav-tag"></span>
+      <button class="ibtn" id="reset-btn">↩ New export</button>
+    </div>
+  </nav>
+
+  <!-- Breadcrumb -->
+  <div class="bc" id="bc">
+    <button class="bc-back" id="bc-back">← Back</button>
+    <button class="bc-link" onclick="drillTo('all')">All Clients</button>
+    <span class="bc-sep" id="bcs1" style="display:none">›</span>
+    <button class="bc-link" id="bc-client" style="display:none"></button>
+    <span class="bc-sep" id="bcs2" style="display:none">›</span>
+    <span class="bc-cur" id="bc-job" style="display:none"></span>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar" id="filter-bar">
+    <div class="fg fg-search">
+      <label>Search</label>
+      <input type="text" id="f-search" placeholder="Budget name, job number…">
+    </div>
+    <div class="fg">
+      <label>Client</label>
+      <select id="f-client"><option value="">All clients</option></select>
+    </div>
+    <div class="fg">
+      <label>From</label>
+      <input type="date" id="f-from">
+    </div>
+    <div class="fg">
+      <label>To</label>
+      <input type="date" id="f-to">
+    </div>
+    <div class="fg">
+      <label>Status</label>
+      <select id="f-status">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Show only</label>
+      <div class="toggle-group">
+        <button class="tpill amber" id="t-cos" onclick="toggleFilter('cos')">Has COS line item</button>
+        <button class="tpill" id="t-excl" onclick="toggleFilter('excl')">Has forecast exclusion</button>
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button class="f-clear" onclick="clearFilters()">Clear</button>
+      <button class="f-apply" onclick="applyFilters()">Apply</button>
+    </div>
+  </div>
+
+  <!-- Active filter tags -->
+  <div class="active-filters" id="active-filters"></div>
+
+  <div class="dash-body">
+    <div class="notice" id="demo-notice" style="display:none">⚠ Sample data — drop your real Polaris CSV to see actual figures.</div>
+
+    <!-- KPIs -->
+    <div class="kpi-strip">
+      <div class="kpi" style="--kc:var(--muted)"><div class="kpi-l">Gross Revenue</div><div class="kpi-v" id="k-gross">—</div><div class="kpi-s">Before deductions</div></div>
+      <div class="kpi" style="--kc:var(--amber)"><div class="kpi-l">Third-Party Costs</div><div class="kpi-v" id="k-tp">—</div><div class="kpi-s">COS + Paid Media</div></div>
+      <div class="kpi" style="--kc:var(--accent)"><div class="kpi-l">Net Revenue</div><div class="kpi-v" id="k-net">—</div><div class="kpi-s">Retained income</div></div>
+      <div class="kpi" style="--kc:var(--green)"><div class="kpi-l">Net Margin</div><div class="kpi-v" id="k-margin">—</div><div class="kpi-s">Net / Gross</div></div>
+      <div class="kpi" style="--kc:var(--muted)"><div class="kpi-l">Budgets</div><div class="kpi-v" id="k-count">—</div><div class="kpi-s" id="k-count-s">In view</div></div>
+      <div class="kpi" style="--kc:var(--amber)"><div class="kpi-l">With COS Lines</div><div class="kpi-v" id="k-cos">—</div><div class="kpi-s">Have third-party items</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid-2" id="charts-row">
+      <div class="panel">
+        <div class="ph"><h3>Revenue breakdown</h3><span>Gross vs Net</span></div>
+        <div class="pb"><div class="cw"><canvas id="c-donut"></canvas></div></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><h3 id="bar-title">By client</h3><span id="bar-sub">Click bar to drill in</span></div>
+        <div class="pb"><div class="cw"><canvas id="c-bar"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="panel">
+      <div class="ph">
+        <h3 id="tbl-title">All Budgets</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="tbl-sub" style="font-size:11px;color:var(--muted)"></span>
+          <div class="vtabs" id="vtabs">
+            <button class="vt on" onclick="setView('client')">Client</button>
+            <button class="vt" onclick="setView('job')">Job</button>
+            <button class="vt" onclick="setView('budget')">Budget</button>
+          </div>
+        </div>
+      </div>
+      <div class="tscroll">
+        <table class="dt">
+          <thead id="th"></thead>
+          <tbody id="tb"></tbody>
+          <tfoot id="tf"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+let allData = [];
+let view = 'client';
+let drillClient = null, drillJob = null;
+let activeFilters = { search:'', client:'', from:'', to:'', status:'', cos:false, excl:false };
+let pendingFilters = {};
+let sortCol = 'net_revenue', sortDir = 'desc';
+let chartD = null, chartB = null;
+
+// ── FORMAT ──
+const fmt  = n => new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(n);
+const fmtD = n => new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',minimumFractionDigits:2}).format(n);
+const pct  = n => (+n).toFixed(1)+'%';
+const pill = m => { const c=m>=60?'mh':m>=30?'mm':'ml'; return `<span class="mp ${c}">${pct(m)}</span>`; };
+const esc  = s => (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+
+// ── FILTER DATA ──
+function applyAll(rows) {
+  const f = activeFilters;
+  return rows.filter(r => {
+    if (drillClient && r.client_name !== drillClient) return false;
+    if (drillJob    && r.job_number  !== drillJob)    return false;
+    if (f.search) {
+      const q = f.search.toLowerCase();
+      if (!r.budget_name.toLowerCase().includes(q) &&
+          !r.job_number.toLowerCase().includes(q) &&
+          !(r.client_name||'').toLowerCase().includes(q)) return false;
+    }
+    if (f.client && r.client_name !== f.client) return false;
+    if (f.from   && r.start_date < f.from) return false;
+    if (f.to     && r.start_date > f.to)   return false;
+    if (f.status && r.status !== f.status) return false;
+    if (f.cos    && r.has_cos !== 'yes')   return false;
+    if (f.excl   && !r.revenue_forecast_exclusions) return false;
+    return true;
+  });
+}
+
+// ── DRILL ──
+function drillTo(level, val) {
+  if (level==='all')    { drillClient=null; drillJob=null; }
+  if (level==='client') { drillClient=val;  drillJob=null; view='job'; }
+  if (level==='job')    { drillJob=val; view='budget'; }
+  updateBC();
+  render();
+}
+
+function updateBC() {
+  const bc=document.getElementById('bc');
+  const bcc=document.getElementById('bc-client');
+  const bcj=document.getElementById('bc-job');
+  const s1=document.getElementById('bcs1'), s2=document.getElementById('bcs2');
+  const back=document.getElementById('bc-back');
+  if (!drillClient && !drillJob) { bc.classList.remove('on'); return; }
+  bc.classList.add('on');
+  if (drillClient) {
+    s1.style.display=''; bcc.style.display='';
+    bcc.textContent=drillClient;
+    bcc.onclick=()=>drillTo('client',drillClient);
+  }
+  if (drillJob) {
+    s2.style.display=''; bcj.style.display='';
+    bcj.textContent='Job '+drillJob;
+  } else {
+    s2.style.display='none'; bcj.style.display='none';
+  }
+  back.onclick = drillJob ? ()=>drillTo('client',drillClient) : ()=>drillTo('all');
+}
+
+// ── VIEW ──
+function setView(v) {
+  view=v;
+  document.querySelectorAll('.vt').forEach((t,i)=>t.classList.toggle('on',['client','job','budget'][i]===v));
+  render();
+}
+
+// ── FILTERS ──
+function applyFilters() {
+  activeFilters.search = document.getElementById('f-search').value.trim();
+  activeFilters.client = document.getElementById('f-client').value;
+  activeFilters.from   = document.getElementById('f-from').value;
+  activeFilters.to     = document.getElementById('f-to').value;
+  activeFilters.status = document.getElementById('f-status').value;
+  renderActiveTags();
+  render();
+}
+
+function clearFilters() {
+  activeFilters = {search:'',client:'',from:'',to:'',status:'',cos:false,excl:false};
+  document.getElementById('f-search').value='';
+  document.getElementById('f-client').value='';
+  document.getElementById('f-from').value='';
+  document.getElementById('f-to').value='';
+  document.getElementById('f-status').value='';
+  document.getElementById('t-cos').classList.remove('on');
+  document.getElementById('t-excl').classList.remove('on');
+  renderActiveTags();
+  render();
+}
+
+function toggleFilter(f) {
+  activeFilters[f] = !activeFilters[f];
+  document.getElementById('t-'+f).classList.toggle('on', activeFilters[f]);
+  renderActiveTags();
+  render();
+}
+
+// allow enter key on search
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('f-search').addEventListener('keydown', e => { if(e.key==='Enter') applyFilters(); });
+  document.getElementById('f-client').addEventListener('change', applyFilters);
+  document.getElementById('f-from').addEventListener('change', applyFilters);
+  document.getElementById('f-to').addEventListener('change', applyFilters);
+  document.getElementById('f-status').addEventListener('change', applyFilters);
+});
+
+function renderActiveTags() {
+  const f = activeFilters;
+  const el = document.getElementById('active-filters');
+  const tags = [];
+  if (f.search) tags.push(['search', `Search: "${f.search}"`]);
+  if (f.client) tags.push(['client', `Client: ${f.client}`]);
+  if (f.from)   tags.push(['from',   `From: ${f.from}`]);
+  if (f.to)     tags.push(['to',     `To: ${f.to}`]);
+  if (f.status) tags.push(['status', `Status: ${f.status}`]);
+  if (f.cos)    tags.push(['cos',    'Has COS line item']);
+  if (f.excl)   tags.push(['excl',   'Has forecast exclusion']);
+  el.innerHTML = tags.map(([k,label])=>`
+    <span class="af-tag">${label}
+      <button onclick="removeFilter('${k}')" title="Remove">×</button>
+    </span>`).join('');
+}
+
+function removeFilter(k) {
+  if (k==='cos'||k==='excl') {
+    activeFilters[k]=false;
+    document.getElementById('t-'+k).classList.remove('on');
+  } else {
+    activeFilters[k]='';
+    const el = {search:'f-search',client:'f-client',from:'f-from',to:'f-to',status:'f-status'}[k];
+    if(el) document.getElementById(el).value='';
+  }
+  renderActiveTags();
+  render();
+}
+
+// ── MAIN RENDER ──
+function render() {
+  const rows = applyAll(allData);
+  const tg = rows.reduce((s,r)=>s+r.gross_revenue,0);
+  const ttp= rows.reduce((s,r)=>s+r.third_party,0);
+  const tn = rows.reduce((s,r)=>s+r.net_revenue,0);
+  const tm = tg>0?tn/tg*100:0;
+  const cosCount = rows.filter(r=>r.has_cos==='yes').length;
+
+  // KPIs
+  document.getElementById('k-gross').textContent  = fmt(tg);
+  document.getElementById('k-tp').textContent     = fmt(ttp);
+  document.getElementById('k-net').textContent    = fmt(tn);
+  document.getElementById('k-margin').textContent = pct(tm);
+  document.getElementById('k-count').textContent  = rows.length;
+  document.getElementById('k-cos').textContent    = cosCount;
+  document.getElementById('nav-tag').textContent  =
+    (drillJob?'Job '+drillJob:drillClient||'All') + ' · ' + rows.length + ' budgets';
+
+  // Charts hidden at job-drill level
+  const cr = document.getElementById('charts-row');
+  cr.style.display = drillJob?'none':'';
+  if (!drillJob) renderCharts(rows, tg, ttp, tn);
+
+  renderTable(rows, tg, ttp, tn, tm);
+}
+
+// ── CHARTS ──
+function renderCharts(rows, tg, ttp, tn) {
+  if (chartD){chartD.destroy();chartD=null}
+  if (chartB){chartB.destroy();chartB=null}
+
+  const ctxD = document.getElementById('c-donut').getContext('2d');
+  chartD = new Chart(ctxD,{
+    type:'doughnut',
+    data:{
+      labels:['Net Revenue','Third-Party Costs','Other'],
+      datasets:[{
+        data:[tn,ttp,Math.max(0,tg-tn-ttp)],
+        backgroundColor:['rgba(0,212,170,.8)','rgba(240,165,0,.7)','rgba(125,133,144,.22)'],
+        borderColor:'#0d1117',borderWidth:3,hoverOffset:5
+      }]
+    },
+    options:{cutout:'68%',plugins:{
+      legend:{position:'bottom',labels:{color:'#7d8590',font:{size:11,family:'Instrument Sans'},padding:12}},
+      tooltip:{callbacks:{label:ctx=>' '+fmt(ctx.raw)+' ('+pct(ctx.raw/tg*100)+')'}}
+    }}
+  });
+
+  // Group for bar
+  let groups={};
+  if (!drillClient) {
+    rows.forEach(r=>{
+      const k=r.client_name||'Unknown';
+      if(!groups[k]) groups[k]={net:0,tp:0,dl:'client',dv:k};
+      groups[k].net+=r.net_revenue; groups[k].tp+=r.third_party;
+    });
+    document.getElementById('bar-title').textContent='By client';
+    document.getElementById('bar-sub').textContent='Click bar to drill in';
+  } else {
+    rows.forEach(r=>{
+      const k=r.job_number||'—';
+      if(!groups[k]) groups[k]={net:0,tp:0,dl:'job',dv:k};
+      groups[k].net+=r.net_revenue; groups[k].tp+=r.third_party;
+    });
+    document.getElementById('bar-title').textContent=drillClient+' — by job';
+    document.getElementById('bar-sub').textContent='Click bar to drill in';
+  }
+  const top=Object.values(groups).sort((a,b)=>b.net-a.net).slice(0,10);
+
+  const ctxB=document.getElementById('c-bar').getContext('2d');
+  chartB=new Chart(ctxB,{
+    type:'bar',
+    data:{
+      labels:top.map(g=>g.dv.length>20?g.dv.slice(0,18)+'…':g.dv),
+      datasets:[
+        {label:'Net Revenue',data:top.map(g=>g.net),backgroundColor:'rgba(0,212,170,.7)',borderRadius:4},
+        {label:'Third-Party',data:top.map(g=>g.tp),backgroundColor:'rgba(240,165,0,.4)',borderRadius:4}
+      ]
+    },
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      onClick:(e,els)=>{ if(!els.length)return; const g=top[els[0].index]; drillTo(g.dl,g.dv); },
+      plugins:{
+        legend:{labels:{color:'#7d8590',font:{size:11,family:'Instrument Sans'},padding:10}},
+        tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+fmt(ctx.raw)}}
+      },
+      scales:{
+        x:{stacked:true,ticks:{color:'#7d8590',font:{size:10},callback:v=>'$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(42,52,65,.5)'}},
+        y:{stacked:true,ticks:{color:'#e6edf3',font:{size:11,family:'Instrument Sans'}},grid:{display:false}}
+      }
+    }
+  });
+}
+
+// ── TABLE ──
+function groupBy(arr,key){return arr.reduce((a,r)=>{const k=r[key]||'—';if(!a[k])a[k]=[];a[k].push(r);return a;},{})}
+function sfn(key){return(a,b)=>{const av=a[key]??0,bv=b[key]??0;if(typeof av==='string')return sortDir==='asc'?av.localeCompare(bv):bv.localeCompare(av);return sortDir==='asc'?av-bv:bv-av;}}
+function sortBy(col){sortDir=sortCol===col?(sortDir==='desc'?'asc':'desc'):'desc';sortCol=col;render();}
+function thSort(col,label){const a=sortCol===col?(sortDir==='desc'?' ↓':' ↑'):'';return `<th onclick="sortBy('${col}')">${label}${a}</th>`;}
+function thSortL(col,label){const a=sortCol===col?(sortDir==='desc'?' ↓':' ↑'):'';return `<th class="tl" onclick="sortBy('${col}')">${label}${a}</th>`;}
+
+function renderTable(rows, tg, ttp, tn, tm) {
+  const th=document.getElementById('th'),tb=document.getElementById('tb'),tf=document.getElementById('tf');
+  const vt=document.getElementById('vtabs'), ttl=document.getElementById('tbl-title'), tsub=document.getElementById('tbl-sub');
+  let v = drillJob ? 'budget' : view;
+  vt.style.display = drillJob?'none':'';
+
+  if (v==='client' && !drillClient) {
+    ttl.textContent='By Client'; 
+    const clients=Object.entries(groupBy(rows,'client_name')).map(([n,rs])=>({
+      name:n,budgets:rs.length,
+      gross:rs.reduce((s,r)=>s+r.gross_revenue,0),
+      tp:rs.reduce((s,r)=>s+r.third_party,0),
+      net:rs.reduce((s,r)=>s+r.net_revenue,0),
+      margin:rs.reduce((s,r)=>s+r.gross_revenue,0)>0?rs.reduce((s,r)=>s+r.net_revenue,0)/rs.reduce((s,r)=>s+r.gross_revenue,0)*100:0,
+      cos:rs.filter(r=>r.has_cos==='yes').length
+    })).sort(sfn(sortCol==='net_revenue'?'net':sortCol==='gross_revenue'?'gross':sortCol==='third_party'?'tp':sortCol==='net_margin_pct'?'margin':sortCol));
+    tsub.textContent=clients.length+' clients';
+    th.innerHTML=`<tr>${thSortL('name','Client')}${thSort('budgets','Budgets')}${thSort('cos','With COS')}${thSort('gross','Gross Revenue')}${thSort('tp','Third-Party')}${thSort('net','Net Revenue')}${thSort('margin','Net Margin')}</tr>`;
+    tb.innerHTML=clients.map(c=>`<tr>
+      <td class="tl"><button class="drill" onclick="drillTo('client','${esc(c.name)}')">${c.name||'—'}</button></td>
+      <td>${c.budgets}</td>
+      <td>${c.cos>0?`<span class="cos-tag">✓ ${c.cos}</span>`:'—'}</td>
+      <td>${fmtD(c.gross)}</td>
+      <td class="${c.tp>0?'ct':''}">${c.tp>0?fmtD(c.tp):'—'}</td>
+      <td class="cn">${fmtD(c.net)}</td>
+      <td>${pill(c.margin)}</td>
+    </tr>`).join('');
+    tf.innerHTML=`<tr><td class="tl"><strong>Total (${clients.length} clients)</strong></td><td><strong>${rows.length}</strong></td><td></td><td><strong>${fmtD(tg)}</strong></td><td class="ct"><strong>${fmtD(ttp)}</strong></td><td class="cn"><strong>${fmtD(tn)}</strong></td><td>${pill(tm)}</td></tr>`;
+
+  } else if (v==='job') {
+    ttl.textContent=drillClient?drillClient+' — By Job':'By Job Number';
+    const jobs=Object.entries(groupBy(rows,'job_number')).map(([jn,rs])=>({
+      job:jn,client:rs[0].client_name,budgets:rs.length,
+      gross:rs.reduce((s,r)=>s+r.gross_revenue,0),
+      tp:rs.reduce((s,r)=>s+r.third_party,0),
+      net:rs.reduce((s,r)=>s+r.net_revenue,0),
+      margin:rs.reduce((s,r)=>s+r.gross_revenue,0)>0?rs.reduce((s,r)=>s+r.net_revenue,0)/rs.reduce((s,r)=>s+r.gross_revenue,0)*100:0,
+      cos:rs.filter(r=>r.has_cos==='yes').length
+    })).sort(sfn(sortCol==='net_revenue'?'net':sortCol==='gross_revenue'?'gross':sortCol==='third_party'?'tp':sortCol==='net_margin_pct'?'margin':sortCol));
+    tsub.textContent=jobs.length+' jobs';
+    const showClient=!drillClient;
+    th.innerHTML=`<tr>${thSortL('job','Job Number')}${showClient?thSortL('client','Client'):''}${thSort('budgets','Budgets')}${thSort('cos','With COS')}${thSort('gross','Gross Revenue')}${thSort('tp','Third-Party')}${thSort('net','Net Revenue')}${thSort('margin','Net Margin')}</tr>`;
+    tb.innerHTML=jobs.map(j=>`<tr>
+      <td class="tl"><button class="drill" onclick="drillTo('job','${esc(j.job)}')">${j.job||'—'}</button></td>
+      ${showClient?`<td class="tl" style="color:var(--muted);font-size:11px">${j.client||'—'}</td>`:''}
+      <td>${j.budgets}</td>
+      <td>${j.cos>0?`<span class="cos-tag">✓ ${j.cos}</span>`:'—'}</td>
+      <td>${fmtD(j.gross)}</td>
+      <td class="${j.tp>0?'ct':''}">${j.tp>0?fmtD(j.tp):'—'}</td>
+      <td class="cn">${fmtD(j.net)}</td>
+      <td>${pill(j.margin)}</td>
+    </tr>`).join('');
+    tf.innerHTML=`<tr><td class="tl"><strong>Total (${jobs.length} jobs)</strong></td>${showClient?'<td></td>':''}<td><strong>${rows.length}</strong></td><td></td><td><strong>${fmtD(tg)}</strong></td><td class="ct"><strong>${fmtD(ttp)}</strong></td><td class="cn"><strong>${fmtD(tn)}</strong></td><td>${pill(tm)}</td></tr>`;
+
+  } else {
+    // BUDGET VIEW
+    ttl.textContent=drillJob?'Job '+drillJob+' — Budgets':drillClient?drillClient+' — Budgets':'All Budgets';
+    tsub.textContent=rows.length+' budgets';
+    const sc=!drillClient, sj=!drillJob;
+    const sorted=[...rows].sort(sfn(sortCol));
+    th.innerHTML=`<tr>
+      ${thSortL('budget_name','Budget')}
+      ${sc?thSortL('client_name','Client'):''}
+      ${sj?thSort('job_number','Job'):''}
+      ${thSort('status','Status')}
+      ${thSort('start_date','Start')}
+      ${thSort('gross_revenue','Gross Revenue')}
+      ${thSort('third_party','Third-Party')}
+      ${thSort('net_revenue','Net Revenue')}
+      ${thSort('net_margin_pct','Margin')}
+      <th class="tl">COS</th>
+      <th class="tl">Forecast Exclusion</th>
+    </tr>`;
+    tb.innerHTML=sorted.map(r=>`<tr>
+      <td class="tl"><span style="font-weight:500">${r.budget_name}</span><span class="sub">#${r.budget_number||'—'}</span></td>
+      ${sc?`<td class="tl" style="color:var(--muted);font-size:11px">${r.client_name||'—'}</td>`:''}
+      ${sj?`<td style="color:var(--muted);font-size:11px">${r.job_number||'—'}</td>`:''}
+      <td style="font-size:11px;color:var(--muted)">${r.status||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${r.start_date||'—'}</td>
+      <td>${fmtD(r.gross_revenue)}</td>
+      <td class="${r.third_party>0?'ct':''}">${r.third_party>0?fmtD(r.third_party):'—'}</td>
+      <td class="cn">${fmtD(r.net_revenue)}</td>
+      <td>${pill(r.net_margin_pct)}</td>
+      <td class="tl">${r.has_cos==='yes'?'<span class="cos-tag">✓ COS</span>':'—'}</td>
+      <td class="tl">${r.revenue_forecast_exclusions?`<span class="excl-tag" title="${esc(r.revenue_forecast_exclusions)}">${r.revenue_forecast_exclusions}</span>`:'—'}</td>
+    </tr>`).join('');
+    tf.innerHTML=`<tr>
+      <td class="tl"><strong>Total (${sorted.length})</strong></td>
+      ${sc?'<td></td>':''} ${sj?'<td></td>':''} <td></td><td></td>
+      <td><strong>${fmtD(tg)}</strong></td>
+      <td class="ct"><strong>${fmtD(ttp)}</strong></td>
+      <td class="cn"><strong>${fmtD(tn)}</strong></td>
+      <td>${pill(tm)}</td><td></td><td></td>
+    </tr>`;
+  }
+}
+
+// ── LOAD ──
+function loadRows(rows, isDemo=false) {
+  const norm=rows.map(r=>{const o={};for(const[k,v]of Object.entries(r))o[k.toLowerCase().trim().replace(/\s+/g,'_')]=v;return o;});
+  allData=norm.map(r=>({
+    budget_id:    r.budget_id||'',
+    budget_number:r.budget_number||r.number||'',
+    budget_name:  r.budget_name||r.name||'',
+    job_number:   r.job_number||'',
+    client_name:  r.client_name||r.client||'',
+    status:       r.status||'',
+    start_date:   r.start_date||'',
+    end_date:     r.end_date||'',
+    gross_revenue:parseFloat(r.gross_revenue||r.revenue||0),
+    third_party:  parseFloat(r.third_party_costs||r.third_party||0),
+    net_revenue:  parseFloat(r.net_revenue||0),
+    net_margin_pct:parseFloat(r.net_margin_pct||r.net_margin_percent||r.net_margin||0),
+    has_cos:      (r.has_cos||r.has_cos_third_party_supplier_service||'no').toLowerCase()==='yes'?'yes':'no',
+    revenue_forecast_exclusions: r.revenue_forecast_exclusions||'',
+  })).filter(r=>r.gross_revenue>0||r.net_revenue!==0);
+
+  if (!allData.length){alert('No data found — check CSV matches Query 1 (v4) columns.');return;}
+
+  // Populate client dropdown
+  const clients=[...new Set(allData.map(r=>r.client_name).filter(Boolean))].sort();
+  const sel=document.getElementById('f-client');
+  sel.innerHTML='<option value="">All clients</option>'+clients.map(c=>`<option value="${esc(c)}">${c}</option>`).join('');
+
+  // Set date range defaults
+  const dates=allData.map(r=>r.start_date).filter(Boolean).sort();
+  if(dates.length){document.getElementById('f-from').value=dates[0];document.getElementById('f-to').value=dates[dates.length-1];}
+
+  drillClient=null;drillJob=null;view='client';
+  activeFilters={search:'',client:'',from:'',to:'',status:'',cos:false,excl:false};
+  document.getElementById('demo-notice').style.display=isDemo?'flex':'none';
+  document.getElementById('upload-screen').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('bc').classList.remove('on');
+  renderActiveTags();
+  render();
+}
+
+// ── FILE EVENTS ──
+const dz=document.getElementById('drop-zone'),fi=document.getElementById('file-input');
+fi.addEventListener('change',e=>{if(e.target.files[0])Papa.parse(e.target.files[0],{header:true,skipEmptyLines:true,complete:r=>loadRows(r.data)});});
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.csv'))Papa.parse(f,{header:true,skipEmptyLines:true,complete:r=>loadRows(r.data)});else alert('Please drop a .csv file');});
+document.getElementById('reset-btn').addEventListener('click',()=>{
+  if(chartD){chartD.destroy();chartD=null} if(chartB){chartB.destroy();chartB=null}
+  document.getElementById('upload-screen').style.display='flex';
+  document.getElementById('dashboard').style.display='none';
+  fi.value='';
+});
+
+// ── DEMO ──
+document.getElementById('demo-btn').addEventListener('click',()=>{
+  loadRows([
+    {budget_id:'1',budget_number:'41',budget_name:'Brand Campaign Q3',job_number:'300103',client_name:'QuickBooks',status:'active',start_date:'2025-07-01',gross_revenue:29564,third_party_costs:8000,net_revenue:21564,net_margin_pct:72.9,has_cos:'yes',revenue_forecast_exclusions:'Pre-bill'},
+    {budget_id:'2',budget_number:'42',budget_name:'SEO Retainer Jul',job_number:'300103',client_name:'QuickBooks',status:'closed',start_date:'2025-07-01',gross_revenue:12000,third_party_costs:0,net_revenue:12000,net_margin_pct:81.0,has_cos:'no',revenue_forecast_exclusions:''},
+    {budget_id:'3',budget_number:'55',budget_name:'Paid Media Q3',job_number:'300210',client_name:'Apex Co',status:'active',start_date:'2025-08-01',gross_revenue:68000,third_party_costs:42000,net_revenue:26000,net_margin_pct:38.2,has_cos:'yes',revenue_forecast_exclusions:'Exclude Q3'},
+    {budget_id:'4',budget_number:'56',budget_name:'Brand Identity',job_number:'300211',client_name:'Apex Co',status:'active',start_date:'2025-09-01',gross_revenue:44200,third_party_costs:12500,net_revenue:31700,net_margin_pct:71.7,has_cos:'no',revenue_forecast_exclusions:''},
+    {budget_id:'5',budget_number:'60',budget_name:'Annual Report',job_number:'300301',client_name:'Meridian',status:'closed',start_date:'2025-07-01',gross_revenue:18750,third_party_costs:0,net_revenue:18750,net_margin_pct:78.1,has_cos:'no',revenue_forecast_exclusions:''},
+    {budget_id:'6',budget_number:'61',budget_name:'Social Retainer Aug',job_number:'300302',client_name:'Meridian',status:'active',start_date:'2025-08-01',gross_revenue:12000,third_party_costs:1200,net_revenue:10800,net_margin_pct:73.3,has_cos:'yes',revenue_forecast_exclusions:''},
+    {budget_id:'7',budget_number:'70',budget_name:'Video Production',job_number:'300401',client_name:'Novum',status:'active',start_date:'2025-09-01',gross_revenue:55000,third_party_costs:28000,net_revenue:27000,net_margin_pct:49.1,has_cos:'yes',revenue_forecast_exclusions:'Media excl.'},
+    {budget_id:'8',budget_number:'75',budget_name:'Event Marketing',job_number:'300501',client_name:'Castlebrook',status:'closed',start_date:'2025-10-01',gross_revenue:32000,third_party_costs:9500,net_revenue:22500,net_margin_pct:70.3,has_cos:'no',revenue_forecast_exclusions:''},
+    {budget_id:'9',budget_number:'80',budget_name:'Digital Strategy',job_number:'300601',client_name:'Orvana',status:'active',start_date:'2025-11-01',gross_revenue:21000,third_party_costs:0,net_revenue:21000,net_margin_pct:81.0,has_cos:'no',revenue_forecast_exclusions:''},
+    {budget_id:'10',budget_number:'85',budget_name:'Influencer Campaign',job_number:'300701',client_name:'Vantage',status:'active',start_date:'2025-12-01',gross_revenue:41000,third_party_costs:31000,net_revenue:10000,net_margin_pct:24.4,has_cos:'yes',revenue_forecast_exclusions:'Influencer excl.'},
+  ],true);
+});
+</script>
+</body>
+</html>
