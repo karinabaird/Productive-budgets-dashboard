@@ -625,6 +625,13 @@ function loadRows(rows, isDemo=false) {
 
   if (!allData.length){alert('No data found — check CSV matches Query 1 (v4) columns.');return;}
 
+  // Auto-detect cents vs dollars (AI query omits /100 division)
+  const sample=allData.filter(r=>r.gross_revenue>0).map(r=>r.gross_revenue).sort((a,b)=>a-b);
+  const median=sample[Math.floor(sample.length/2)]||0;
+  if(median>500000){
+    allData=allData.map(r=>({...r,gross_revenue:r.gross_revenue/100,third_party:r.third_party/100,net_revenue:r.net_revenue/100}));
+  }
+
   // Populate client dropdown
   const clients=[...new Set(allData.map(r=>r.client_name).filter(Boolean))].sort();
   const sel=document.getElementById('f-client');
